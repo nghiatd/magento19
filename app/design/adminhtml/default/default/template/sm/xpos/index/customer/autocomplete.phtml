@@ -1,0 +1,11 @@
+<ul>
+    <?php foreach ($items as $item){ ?>
+        <li <?php foreach($item as $k=>$v){?> <?php echo $k?>="<?php echo $v?>"<?php } ?>>
+            <span class="name-customer"><?php echo $this->htmlEscape($item['name']) ?></span>
+            <span class="email-customer"><?php echo $item['email'] ?></span>
+        </li>
+    <?php } ?>
+    <?php if(count($items) == 0){ ?>
+        <li id="no_result"><span>No matching results</span></li>
+    <?php } ?>
+</ul>

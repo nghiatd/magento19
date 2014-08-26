@@ -1,0 +1,172 @@
+<div class="main-content">
+    <div class="config">
+        <div class="config-logo">
+            <?php
+            $logo_url = $this->getSkinUrl('sm/xpos/images/logo.png');
+            if(is_file('media/xpos/' . Mage::getStoreConfig('xpos/customize/logo'))){
+                $logo_url = Mage::getBaseUrl('media') . 'xpos/' . Mage::getStoreConfig('xpos/customize/logo');
+            }
+            ?>
+            <a id="config-button" class="hide"><img src="<?php echo $logo_url; ?>"/></a>
+        </div>
+    </div>
+    <div class="search"><input type="text" id="search-box" value="" /></div>
+    <div id="nav">
+        <ul>
+            <li class="save level-0">
+                <a id="save-button" class="button-save" onclick="saveOrder()">
+                    <span id="order_saved_count" class="value-save"></span>
+                </a>
+            </li>
+            <li class="cancel level-0">
+                <a id="save-button" class="button-cancel" onclick="cancelOrder();"></a>
+            </li>
+            <li class="option level-0">
+                <a id="options_checkout_button" class="button-option"
+                   onclick="show_options_checkout()"></a>
+                <ul class="option-panel" id="option-list">
+                    <?php if (!Mage::getStoreConfig('xpos/general/checkoutcomfirm')) { ?>
+
+                        <?php if (Mage::getStoreConfig('xpos/general/create_invoice_display')): ?>
+                            <li class="level-1 <?php if (Mage::getStoreConfig('xpos/general/create_invoice')) {
+                                echo "active";
+                            } ?>" id="invoice_toggle" name="invoice_toggle">
+                                <a href="javascript:" id="option1-button" class="option"
+                                   onclick="setCheckBox('invoice_toggle');">Create invoice</a>
+                            </li>
+                        <?php endif; ?>
+                        <?php if (Mage::getStoreConfig('xpos/general/create_shipment_display')): ?>
+                            <li class="level-1 <?php if (Mage::getStoreConfig('xpos/general/create_shipment')) {
+                                echo "active";
+                            } ?>" id="shipment_toggle" name="shipment_toggle">
+                                <a href="javascript:" id="option1-button" class="option"
+                                   onclick="setCheckBox('shipment_toggle');">Create shipment</a>
+                            </li>
+                        <?php endif; ?>
+                        <li class="level-1 <?php if (Mage::getStoreConfig('xpos/receipt/print_receipt')) {
+                            echo "active";
+                        } ?>" id="receipt_toggle" name="receipt_toggle">
+                            <a href="javascript:" id="option1-button" class="option"
+                               onclick="setCheckBox('receipt_toggle');">Print receipt</a>
+                        </li>
+                        <?php if (Mage::getStoreConfig('xpos/receipt/enabled')) { ?>
+                            <li class="email-option level-1 <?php if (Mage::getStoreConfig('xpos/receipt/email_receipt')) {
+                                echo "active";
+                            } ?>" id="mail_toggle" name="mail_toggle">
+                                <a href="javascript:" id="option3-button" class="option" onclick="setCheckBox('mail_toggle');">
+                                    <label>Email:</label>                                    
+                                </a>
+                                <input type="email" name="emailreceipt" id="emailreceipt" placeholder="Email receipt" value=""/>
+                            </li>
+                        <?php } ?>
+                    <?php } ?>
+
+                    <li class="level-1 no-hover" id="order-comment">
+                        <a href="javascript:" id="option3-button" class="option">
+                            <label>Comment:</label>
+                            <textarea
+                                name="order[comment][customer_note]" placeholder="Comments" spellcheck="false"></textarea>
+                        </a>
+                    </li>
+                </ul>
+            </li>
+        </ul>
+    </div>
+    <div class="checkout">
+        <div id="grandtotal" class="total">0.00</div>
+        <button id="checkout_mode_button" class="checkout_mode" type="button" onclick="change_checkout_mode()">
+            Checkout
+        </button>
+    </div>
+    <div class="clear"></div>
+</div>
+<script>
+
+    order.commentFieldsBind('order-comment');
+    function cancelOrder() {
+        if (confirm('<?php echo $this->__("Cancel current order?") ?>')) {
+            if (isOnline()) {
+                window.location.href = '<?php echo $this->getUrl('*/*/clear') ?>';
+            }else{
+                clearOrder();
+            }
+        }
+    }
+
+    function submitOffline() {
+        if (isOnline()) {
+            jQuery('#loading-mask').show();
+            var orders = $.jStorage.get("orders");
+            if (orders.length && orders[0].length) {
+                jQuery.ajax({
+                    url: '<?php echo $this->getUrl('adminhtml/xpos/index') ?>',
+                    success: function () {
+                        jQuery.ajax({
+                            url: '<?php echo $this->getUrl('adminhtml/xpos/completeoffline') ?>',
+                            data:orders[0],
+                            dataType:'json',
+                            type:'POST',
+                            success: function (data) {
+                                if (data.status != "success") {
+                                    jQuery('#loading-mask').hide();
+                                    orderInfo = '{"' + unescape(orders[0]).replace(/&/g, '","').replace(/=/g, '":"').replace(/\' /g, '"') + '"}';
+                                    orderJson = jQuery.parseJSON(orderInfo);
+                                    orderJson = jQuery.parseJSON(orderInfo);
+                                    orderJson = jQuery.parseJSON(orderInfo);
+                                    orderInfo = parseOrderInfo(orderJson);
+                                    if (data.msg == '') {
+                                        data.msg = 'Unknown error';
+                                    }
+                                    error = "An error has occured: <strong>'" + data.msg + "'</strong>";
+                                    jQuery("#dialog-modal").html('<p>' + error + '</p><p style="font-size: 10px">Please make a copy of the order details below and re-submit the order manually if needed. <br />To process with the next order, please click on the below button to delete this order from the queue.</p><p style="background: #DDD; padding: 5px; font-size: 10px; line-height: 11px;">' + orderInfo + '</p>');
+                                    jQuery("#dialog-modal").dialog({
+                                        resizable: false,
+                                        width: '500',
+                                        //                                        height:400,
+                                        modal: true,
+                                        buttons: {
+                                            "Delete this order": function () {
+                                                orders.splice(0, 1);
+                                                $.jStorage.set("orders", orders);
+                                                jQuery('#submitOffline').html(orders.length + ' pending orders');
+                                                jQuery('#loading-mask').hide();
+                                                jQuery(this).dialog("close");
+                                            },
+                                            Cancel: function () {
+                                                jQuery(this).dialog("close");
+                                            }
+                                        }
+                                    });
+                                } else {
+                                    orders.splice(0, 1);
+                                    $.jStorage.set("orders", orders);
+                                    jQuery('#count_pending_orders').html(orders.length);
+                                    jQuery('#loading-mask').hide();
+                                    jQuery.ajax({
+                                        url: '<?php echo $this->getUrl('adminhtml/xpos/index') ?>'
+                                    });
+                                    alert('Send 1 order to online');
+                                    //window.open(data.printurl, "_blank", "toolbar=no, location=no, directories=no, status=no, menubar=no, scrollbars=yes, resizable=no, copyhistory=no, width=760, height=600, left=20, top=20");
+                                }
+                            }
+                        });
+                    }
+                });
+            } else {
+                jQuery('#loading-mask').hide();
+            }
+            transactionMoneyLoaded = false;
+        } else {
+            alert('You are not online!');
+        }
+    }
+
+    function saveOrder(){
+        if(jQuery('#order-items_grid tbody tr').length > 0){
+            order.save('<?php echo $this->getUrl("*/*/save"); ?>','<?php echo $this->__("Are you sure to save this order and move to new order screen?") ?>');
+        }else{
+            showOrderSaved();
+        }
+    }
+
+</script>

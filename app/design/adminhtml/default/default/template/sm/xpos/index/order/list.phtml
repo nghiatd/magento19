@@ -1,0 +1,412 @@
+<div class="popup popup-list-order">
+    <span class="button b-close" id="login_popup_close"></span>
+    <h4>Order List</h4>
+    <div id="order-order_grid"></div>
+</div>
+
+<div class="popup popup-saved-order">
+    <span class="button b-close" id="login_popup_close"></span>
+    <h4>Saved Order List</h4>
+    <div id="order-order_saved"></div>
+</div>
+
+<div class="popup-detail-order">
+    <span class="button b-close" id="login_popup_close"></span>
+    <h4>Order Detail</h4>
+    <div id="order-order_view"></div>
+</div>
+
+<div class="popup-creditmemo">
+    <span class="button b-close" id="login_popup_close"></span>
+    <h4>Credit Memo</h4>
+    <div id="order-sales_creditmemo_create"></div>
+</div>
+
+<div class="popup popup-customer-order">
+    <span class="button b-close" id="login_popup_close"></span>
+    <h4>Customer Order List</h4>
+    <div id="order-order_customer_grid"></div>
+</div>
+
+<div class="popup popup-list-transaction">
+    <span class="button b-close" id="login_popup_close"></span>
+    <h4>Transfer money</h4>
+    <div class="popup-transaction">
+        <div id="current_balance_line" onclick="loadCurrentBalance()">Current Balance: <span
+                class="current_balance"></span></div>
+        <div id="manual_transfer">
+            <p class="label">Manual transfer:</p>
+
+            <p class="control"><input type="text" id="transaction_amount" name="transaction_amount"
+                                      placeholder="Amount of money" value="" class="txt_amount"
+                                      onfocus="transactionInputAmountOnfocus();"></p>
+
+            <p class="control"><select size="1" name="transaction_type" id="transaction_type" class="control"
+                                       class="drop_type">
+                    <option value="in">In</option>
+                    <option value="out">Out</option>
+                </select>
+            </p>
+            <p class="control">
+                <button type="button" value="Transfer" id="transaction_submit" onclick="newTransaction()"
+                       class="scalable"><span>Transfer</span></button>
+            </p>
+        </div>
+
+        <div style="clear:  both; font-size: 11px;">
+            <span style="display: none; color:green;" id="transaction_saved"> </span>
+            <span style="display: none; color:red;" id="transaction_not_saved"> </span>
+        </div>
+        <div id="transaction_note_wapper" style=" display:none;">
+            <textarea name="transaction_note" id="transaction_note" style="width:40%; height:5em; "
+                      placeholder="Note"></textarea>
+            <a href="#clear" id="transaction_note_clear" onclick="transactionClearBox();">Clear</a> | <a
+                href="#clear"
+                id="transaction_note_hide" onclick="transactionHideBox();">Hide</a>
+        </div>
+
+        <div id="order-transaction_grid"></div>
+    </div>
+</div>
+
+<div id="btnPrint" href="<?php echo Mage::getUrl('xpos/index') ?>"></div>
+
+<script type="text/javascript">
+
+var orderListLoaded = false;
+var orderSavedLoaded = false;
+function showOrderList() {
+    if (!orderListLoaded) {
+        order.loadArea(['order_grid'], true);
+        orderListLoaded = true;
+    }
+    jQuery('.popup-list-order').bPopup({
+        modalClose: true,
+        opacity: 0.6,
+        speed: 450,
+        transition: 'slideIn',
+        positionStyle: 'fixed' //'fixed' or 'absolute'
+    });
+}
+
+function showOrderSaved() {
+    orderSavedLoaded = true;
+    order.loadArea(['order_saved'], true);
+    jQuery('.popup-saved-order').bPopup({
+        modalClose: true,
+        opacity: 0.6,
+        speed: 450,
+        transition: 'slideIn',
+        positionStyle: 'fixed' //'fixed' or 'absolute'
+    });
+}
+
+function showOrderDetail() {
+    orderListLoaded = false;
+    jQuery('.popup-detail-order').bPopup({
+        modalClose: true,
+        opacity: 0.6,
+        speed: 450,
+        transition: 'slideIn',
+        positionStyle: 'fixed' //'fixed' or 'absolute'
+    });
+    if(orderSavedLoaded){
+        jQuery('.popup-saved-order').bPopup().close();
+        orderSavedLoaded = false;
+    }
+    if(orderListCustomerLoaded){
+        jQuery('.popup-customer-order').bPopup().close();
+    }else{
+        jQuery('.popup-list-order').bPopup().close();
+    }
+}
+
+function showCreditMemo() {
+    orderListLoaded = false;
+    jQuery('.popup-creditmemo').bPopup({
+        modalClose: true,
+        opacity: 0.6,
+        speed: 450,
+        transition: 'slideIn',
+        positionStyle: 'fixed' //'fixed' or 'absolute'
+    });
+    jQuery('.popup-detail-order').bPopup().close();
+}
+
+function onViewOrder(_orderId, _action) {
+    if (jQuery('.select-order:hover').length == 0) {
+        order.loadArea(['order_view'], true, {orderId: _orderId, orderAction: _action});
+        showOrderDetail();
+    }
+}
+
+function onSelectOrder(_action, _orderId, viewoder) {
+    if (_action != '') {
+        switch (_action) {
+            case 'reload':
+                var _url = '<?php echo $this->getUrl('*/xpos/index')?>order_id/' + _orderId;
+                setLocation(_url);
+                break;
+            case 'invoice':
+                orderListLoaded = false;
+                if (viewoder != '') {
+                    order.loadArea(['order_view'], true, {orderId: _orderId, orderAction: 'invoice'});
+                    showOrderDetail();
+                } else {
+                    var _url = '<?php echo $this->getUrl('*/xpos/createInvoice')?>';
+                    jQuery.ajax({
+                        url: _url,
+                        type: 'post',
+                        data: {
+                            orderId: _orderId,
+                            form_key: FORM_KEY,
+                            createInvoice: 1
+                        },
+                        dataType: 'json',
+                        success: function (data) {
+                            jQuery('#messages-grid').show();
+                            jQuery('#detail-messages').html('The invoice has been created.');
+                            jQuery('#bt_invoice').remove();
+                        }
+                    });
+                }
+
+                break;
+            case 'ship':
+                orderListLoaded = false;
+                if (viewoder != '') {
+                    order.loadArea(['order_view'], true, {orderId: _orderId, orderAction: 'ship'});
+                    showOrderDetail();
+                } else {
+                    var _url = '<?php echo $this->getUrl('*/xpos/createShipment')?>';
+                    jQuery.ajax({
+                        url: _url,
+                        type: 'post',
+                        data: {
+                            orderId: _orderId,
+                            form_key: FORM_KEY,
+                            createShipment: 1,
+                            warehouse_id: $.jStorage.get('warehouse_id')
+                        },
+                        dataType: 'json',
+                        success: function (data) {
+                            jQuery('#messages-grid').show();
+                            jQuery('#detail-messages').html('The shipment has been created.');
+                            jQuery('#bt_ship').remove();
+                        }
+                    });
+                }
+
+                break;
+            case 'canceled':
+                orderListLoaded = false;
+                if (viewoder != '') {
+                    order.loadArea(['order_view'], true, {orderId: _orderId, orderAction: 'canceled'});
+                    showOrderDetail();
+                } else {
+                    var _url = '<?php echo $this->getUrl('*/xpos/cancelOrder')?>';
+                    jQuery.ajax({
+                        url: _url,
+                        type: 'post',
+                        data: {
+                            orderId: _orderId,
+                            form_key: FORM_KEY
+                        },
+                        dataType: 'json',
+                        success: function (data) {
+                            jQuery('#messages-grid').show();
+                            jQuery('#detail-messages').html('The order has been cancelled.');
+                            jQuery('#bt_canceled').remove();
+                            jQuery('#bt_ship').remove();
+                            jQuery('#bt_invoice').remove();
+                        }
+                    });
+                }
+
+                break;
+        }
+        checkSavedOrder();
+
+    } else {
+        alert("Please choose one action.");
+    }
+}
+
+function onCreditMemo(_orderId) {
+    order.loadArea(['sales_creditmemo_create'], true, {order_id: _orderId});
+    showCreditMemo();
+}
+
+function submitComment(area, url) {
+    if ($(area)) {
+        var fields = $(area).select('input', 'select', 'textarea');
+        var data = Form.serializeElements(fields, true);
+        url = url + (url.match(new RegExp('\\?')) ? '&isAjax=true' : '?isAjax=true');
+        new Ajax.Request(url, {
+            parameters: $H(data),
+            loaderArea: area,
+            onSuccess: function (transport) {
+                try {
+                    if (transport.responseText.isJSON()) {
+                        var response = transport.responseText.evalJSON()
+                        if (response.error) {
+                            alert(response.message);
+                        }
+                        if (response.ajaxExpired && response.ajaxRedirect) {
+                            setLocation(response.ajaxRedirect);
+                        }
+                        area.replace(response.block);
+                    } else {
+                        //$(area).update(transport.responseText);
+                        area.replace(transport.responseText);
+                    }
+                }
+                catch (e) {
+                    $(area).update(transport.responseText);
+                }
+            }
+        });
+    }
+}
+
+function submitCreditMemoOffline() {
+    if ($('creditmemo_do_offline')) $('creditmemo_do_offline').value = 1;
+    var data = jQuery('#edit_form_creditmemo').serialize();
+    var orderId = jQuery('#xpos-order').val();
+    data += '&order_id=' + orderId + '&form_key=' + FORM_KEY;
+    var _url = '<?php echo $this->getUrl('*/ajaxcreditmemo/save')?>';
+    jQuery.ajax({
+        url: _url,
+        type: 'post',
+        data: data,
+        dataType: 'json',
+        beforeSend: function () {
+            jQuery('#loading-mask').show();
+            jQuery('#loading-mask').css('z-index', '9999');
+        },
+        success: function (data) {
+            if (data.status == '1') {
+                jQuery('.detail-messages').html(data.messages);
+                jQuery('.messages-grid').show();
+                jQuery('#edit_form_creditmemo').remove();
+            } else {
+                alert(data.messages);
+            }
+            jQuery('#loading-mask').hide();
+            jQuery('#loading-mask').css('z-index', '500');
+        }
+    });
+}
+
+var orderListCustomerLoaded = false;
+function showOrderListCustomer() {
+    orderListCustomerLoaded = true;
+    if((jQuery('#customer_type').val() != 'exist') || !isAvailability() ){
+        return false;
+    }
+
+    order.loadArea(['order_customer_grid'], true);
+
+    jQuery('.popup-customer-order').bPopup({
+        modalClose: true,
+        opacity: 0.6,
+        speed: 450,
+        transition: 'slideIn',
+        positionStyle: 'fixed' //'fixed' or 'absolute'
+    });
+}
+
+var transactionMoneyLoaded = false;
+function showTransactionList(){
+
+    <?php if ( Mage::getStoreConfig('xpos/general/printcashtransfer') ): ?>
+    if (!jQuery('.popup-list-transaction').is(':visible')) {
+        jQuery("#btnPrint").click();
+    }
+    <?php endif; ?>
+
+    loadCurrentBalance();
+    if (!transactionMoneyLoaded) {
+        order.loadArea(['transaction_grid'], true);
+        transactionMoneyLoaded = true;
+    }
+    jQuery('.popup-list-transaction').bPopup({
+        modalClose: true,
+        opacity: 0.6,
+        speed: 450,
+        transition: 'slideIn',
+        positionStyle: 'fixed' //'fixed' or 'absolute'
+    });
+}
+
+function loadCurrentBalance() {
+    jQuery.ajax({
+        type: "GET",
+        dataType: "json",
+        url: "<?php echo Mage::helper("adminhtml")->getUrl('*/xpos/currentbalance');?>"
+
+    }).done(function (data) {
+            jQuery(".current_balance").text(data.msg).show();
+
+        });
+}
+
+function newTransaction() {
+    jQuery.noConflict();
+    jQuery("#transaction_not_saved").html('');
+    jQuery("#transaction_saved").html('');
+    jQuery.ajax({
+        type: "GET",
+        dataType: "json",
+        url: "<?php echo Mage::helper("adminhtml")->getUrl('*/xpos/newTransaction');?>",
+        data: {
+            amount: jQuery("#transaction_amount").val(),
+            type: jQuery("#transaction_type").val(),
+            note: jQuery("#transaction_note").val()
+        }
+    }).done(function (data) {
+            if (data.error) {
+                jQuery("#transaction_not_saved").text(data.msg).show();
+            } else {
+                jQuery("#transaction_saved").text(data.msg).show().fadeOut(10000);
+                loadCurrentBalance();
+                order.loadArea(['transaction_grid'], true);
+            }
+            jQuery('#transaction_amount').val('');
+            transactionNoteAfterComplete();
+
+
+        })
+        .fail(function (data) {
+            jQuery("#ajax_loading").html('');
+            jQuery("#transaction_not_saved").text("Can NOT save this transaction. Please recheck the input value or contact with your administrator ").show().fadeOut(10000);
+        });
+
+
+}
+
+function transactionInputAmountOnfocus() {
+    jQuery('#transaction_note_wapper').show();
+}
+
+function transactionNoteAfterComplete() {
+    jQuery('#transaction_note_wapper').hide();
+    jQuery('#transaction_note').val('');
+}
+
+function transactionClearBox() {
+    jQuery('#transaction_note').val('');
+    jQuery('#transaction_amount').val('');
+}
+
+function transactionHideBox() {
+    jQuery('#transaction_note_wapper').hide();
+}
+
+jQuery("#btnPrint").printPage({
+    url: "<?php echo Mage::getUrl('*/xpos/checknetwork') ?>",
+    attr: "href",
+    showMessage: false
+})
+
+</script>
